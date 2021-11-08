@@ -1,0 +1,125 @@
+Written by Fl3x3nViii
+V.A0004
+#Check if 365 Module is installed
+if (Get-InstalledModule -Name 'ExchangeOnlineManagement'){
+    Write-Host "Required Module is installed"
+}
+else {
+    $ExecPolicy = Get-ExecutionPolicy
+
+    if ($ExecPolicy -eq "Restricted" -or $ExecPolicy -eq "Undefined") {
+        write "Your Execution Policy is set to Restricted or Undefined. For this module to install, I need to change to a policy that allows installations. See this link for more information https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_execution_policies?view=powershell-7.1"
+        Start-Sleep -Seconds 5
+        [int]$ExecPolicyPrompt = Read-Host -Prompt "Press 1 for Bypass, 2 for Unrestricted, 3 for RemoteSigned."
+
+        if ($ExecPolicyPrompt = "1"){
+            write "Setting Exec Policy to Bypass"
+            Set-ExecutionPolicy -ExecutionPolicy Bypass            
+        }
+        elseif ($ExecPolicyPrompt = "2"){
+            Write "Setting Exec Policy to Unrestricted"
+            Set-ExecutionPolicy -ExecutionPolicy Unrestricted
+            
+        }elseif ($ExecPolicyPrompt = "3"){
+            Write "Setting Exec Policy to RemoteSigned"
+            Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
+        }
+    }
+
+    Start-Sleep -Seconds 3
+    Write "Installing Exchange Online Management Module"
+    Install-Module -Name 'ExchangeOnlineManagement' -scope CurrentUser 
+}
+
+#Import Exchange Module
+Import-Module ExchangeOnlineManagement
+
+#Connect to 365
+Connect-ExchangeOnline
+
+
+#Begin loop for mailbox management
+ do {
+      
+
+    $UserOp = Read-Host "What would you like to do, Press '1' to Add permissions to user mailboxes, '2' to Audit access, '3' to remove access"
+
+        if ($UserOp -eq '1'){
+        #Get Mailbox of user to make changes to
+        $AllUserMailbox = Get-ExoMailBox
+        $AllUserMailbox = $AllUserMailbox.UserPrincipalName
+        $UserMailBox = $AllUserMailbox | Out-GridView -passthru -Title "Choose the ONE user to make changes to"
+
+        #Choose whether its a single or multiple users to give access to that mailbox
+        [int]$UserInput = Read-Host -Prompt "Do you want a single user or multiple users to gain access to the mailbox? Press 1 for Single, 2 for Multiple"
+
+        #Give access to mailbox
+        if ($UserInput -eq '1'){
+            $AllUserMailbox = Get-ExoMailBox
+            $AllUserMailbox = $AllUserMailbox.UserPrincipalName
+            $GrantedUser = $AllUserMailbox | Out-GridView -PassThru -Title "Select the user to grant the access to"
+
+        #Select access level
+            $AccessType = Read-Host -Prompt "What type of permission do you want them to have? Press 1 for Full Access, 2 for Read Only"
+
+        if ($AccessType -eq '1') {
+            Add-MailboxPermission -Identity "$UserMailbox" -User "$GrantedUser" -AccessRights FullAccess -InheritanceType All
+        }elseif ($AccessType -eq '2') {
+            Add-MailboxPermission -Identity "$UserMailbox" -User "$GrantedUser" -AccessRights ReadPermission -InheritanceType All
+        }
+        #Give access to mailbox for multiple users
+        }elseif ($UserInput -eq '2'){
+            $AllUserMailbox = Get-ExoMailBox
+            $AllUserMailbox = $AllUserMailbox.UserPrincipalName
+            $GrantedUsers = $AllUserMailbox | Out-GridView -PassThru -Title "Select users to give access to"
+
+        #Select access level to mailbox
+            $AccessType = Read-Host -Prompt "What type of permission do you want them to have? Press 1 for Full Access, 2 for Read Only"
+        #Execute loop granting access to mailbox.
+            foreach ($GrantedUser in $GrantedUsers){
+                $MultiUser = $GrantedUser
+                if ($AccessType -eq '1') {
+                    Add-MailboxPermission -Identity "$UserMailbox" -User "$MultiUser" -AccessRights FullAccess -InheritanceType All
+                }elseif ($AccessType -eq '2') {
+                    Add-MailboxPermission -Identity "$UserMailbox" -User "$MultiUser" -AccessRights ReadPermission -InheritanceType All
+                }
+            }
+}#Begin audit
+}elseif($UserOp -eq '2'){
+
+#Get mailbox 
+$AllUserMailbox = Get-ExoMailBox
+$AllUserMailbox = $AllUserMailbox.UserPrincipalName
+$User2Review = $AllUserMailbox | Out-GridView -PassThru -Title "Select the mailbox(s) you want to audit"
+
+    #Loop check permissions on mailboxes
+    foreach ($User2Review in $User2Review) {
+        $UserPerms = $User2Review
+
+        Get-EXOMailboxPermission -Identity "$UserPerms" 
+    }
+}elseif($UserOp -eq '3'){
+    
+    #Get user you want to remove access from.
+    $AllUserMailbox = Get-ExoMailBox
+    $AllUserMailbox = $AllUserMailbox.UserPrincipalName
+    $UserMailBox = $AllUserMailbox | Out-GridView -passthru -Title "Choose the ONE user to make changes to"
+
+    #Get Users you want to remove from mailbox.
+    $AllUserMailbox = Get-ExoMailBox
+    $AllUserMailbox = $AllUserMailbox.UserPrincipalName
+    $GrantedUsers = $AllUserMailbox | Out-GridView -PassThru -Title "Select users to remove access"
+
+    #Execute loop granting access to mailbox.
+    foreach ($GrantedUser in $GrantedUsers){
+        $MultiUser = $GrantedUser
+        Remove-MailboxPermission -Identity "$UserMailbox" -User "$MultiUser" -AccessRights FullAccess -InheritanceType All 
+        Remove-MailboxPermission -Identity "$UserMailbox" -User "$MultiUser" -AccessRights ReadPermission -InheritanceType All
+
+    }
+
+}
+[string]$UserOp = Read-Host "Would you like to make more changes? Press 1 to continue or X to exit"
+} until ($UserOp -eq "X")
+
+Disconnect-ExchangeOnline -Confirm:$false
