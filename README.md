@@ -9,5 +9,4 @@ I will be updating this by cleaning/simplifying the code in the future, but the 
 
 To come:
 
-Calendar access
-Ability to manage multiple mailboxes at once. 
+Calendar access & Ability to manage multiple mailboxes at once. 
